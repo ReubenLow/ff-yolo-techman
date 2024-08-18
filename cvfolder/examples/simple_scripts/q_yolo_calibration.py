@@ -22,6 +22,15 @@ import json
 import os
 import sys
 
+# -----------------------------------------------------------------------------
+# Initialization and Configuration
+# -----------------------------------------------------------------------------
+# Initialize the YOLO model with a pre-trained model (YOLOv8n) and configure
+# the Intel RealSense camera pipeline to capture both color and depth data.
+# This setup is essential for the subsequent object detection and coordinate
+# transformation processes.
+# -----------------------------------------------------------------------------
+
 # INIT YOLO
 model = YOLO('yolov8n.pt')  # Ensure this is the correct path to your YOLO model
 
@@ -29,8 +38,8 @@ model = YOLO('yolov8n.pt')  # Ensure this is the correct path to your YOLO model
 pipe = rs.pipeline()
 cfg = rs.config()
 
-cfg.enable_stream(rs.stream.color, 424, 240, rs.format.bgr8, 6)
-cfg.enable_stream(rs.stream.depth, 424, 240, rs.format.z16, 6)
+cfg.enable_stream(rs.stream.color, 424, 240, rs.format.bgr8, 6)  # Enable color stream with specific resolution and format
+cfg.enable_stream(rs.stream.depth, 424, 240, rs.format.z16, 6)   # Enable depth stream with specific resolution and format
 
 # Start the pipeline
 profile = pipe.start(cfg)
@@ -44,12 +53,25 @@ align_to = rs.stream.color
 align = rs.align(align_to)
 
 
-#YOLO
+# -----------------------------------------------------------------------------
+# Function: capture_image
+# -----------------------------------------------------------------------------
+# Purpose:
+# This function captures an image from the Intel RealSense camera's color stream
+# and saves it as a JPEG file. The saved image is later used for object detection.
+#
+# Parameters:
+# - color_frame: The color frame captured from the RealSense camera.
+#
+# Returns:
+# - file_path: The path where the captured image is saved.
+# -----------------------------------------------------------------------------
+
 def capture_image(color_frame):
-    # Convert the color frame to a numpy array if it's not already
+    # Convert the color frame to a numpy array
     color_image = np.asanyarray(color_frame.get_data())
     
-    # Save the captured frame to the specified file path
+    # Save the captured frame to a specified file path
     file_path = "image.jpg"
     cv2.imwrite(file_path, color_image)
     print("Image captured and saved successfully!")
@@ -57,48 +79,103 @@ def capture_image(color_frame):
     return file_path
 
 
-# Latest
+# -----------------------------------------------------------------------------
+# Function: detect_objects_in_image
+# -----------------------------------------------------------------------------
+# Purpose:
+# This function uses the YOLO model to detect objects in a captured image.
+# It identifies the target object specified by the user and returns its bounding
+# box coordinates.
+#
+# Parameters:
+# - image_path: The path to the image file to be processed.
+# - target_object: The object to detect in the image (e.g., "teddy bear").
+#
+# Returns:
+# - A dictionary containing the bounding box coordinates (x1, y1, x2, y2) if the
+#   target object is detected; otherwise, returns None.
+# -----------------------------------------------------------------------------
+
 def detect_objects_in_image(image_path, target_object):
     image = cv2.imread(image_path)  # Load the image
     results = model(image)  # Perform object detection using YOLO
     
+    # Loop through detection results and find the target object
     for result in results:
         boxes = result.boxes
         for box in boxes:
             class_id = int(box.cls[0])  # Get the class ID of the detected object
             label = model.names[class_id]  # Get the label of the object
 
-            if label == target_object:  # Check if this is the target object, e.g. teddy bear
+            if label == target_object:  # Check if this is the target object, e.g., teddy bear
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 return {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
     
     return None  # If the target object is not detected, return None
 
 
-# Latest
-def get_coordinates(pipe, align, target_object="teddy bear"):
+# -----------------------------------------------------------------------------
+# Function: get_coordinates
+# -----------------------------------------------------------------------------
+# Purpose:
+# This function captures color and depth frames from the RealSense camera, detects
+# the target object using YOLO, and calculates its real-world coordinates based on
+# the depth data. It then saves these coordinates to a JSON file.
+#
+# Parameters:
+# - pipe: The RealSense camera pipeline.
+# - align: The alignment object used to align depth frames to color frames.
+# - target_object: The object to detect and locate (default is "teddy bear").
+#
+# Returns:
+# - A tuple containing the real-world coordinates (Z, X, Y) of the detected object
+#   in meters, or None if the process fails.
+#
+# Simulated Camera View:
+# The following diagram simulates the camera's view with the top-left corner as the origin (0, 0).
+# The detected object is represented with a bounding box, and the center of the box (detected object)
+# is marked with an asterisk (*) which corresponds to the center (x, y) in the code.
 
-    # For reference
-    # dpt_frame = pipe.wait_for_frames().get_depth_frame().as_depth_frame()
-    # pixel_distance_in_meters = dpt_frame.get_distance(x,y)
+# (0,0) -----------------------------------------------> x-axis
+#   |      ______________________________________
+#   |     |                                      |
+#   |     |                                      |
+#   |     |                                      |
+#   |     |       +---------------------+        |
+#   |     |       |                     |        |
+#   |     |       |      [Object]       |        |
+#   |     |       |         *           |        |
+#   |     |       |                     |        |
+#   |     |       +---------------------+        |
+#   |     |                                      |
+#   |     |                                      |
+#   |     |                                      |
+#   |     |______________________________________|
+#   v
+# y-axis
+#
+# Legend:
+# - [Object]: Detected object (e.g., teddy bear).
+# - *: Center of the bounding box where the object's coordinates (x, y) are calculated.
+# -----------------------------------------------------------------------------
+
+def get_coordinates(pipe, align, target_object="teddy bear"):
 
     output_directory = "/home/reuben/techmanpy"
 
     # Ensure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
 
-    # Construct the file path for JSON file
+    # Save the target object name to a JSON file
     json_file_path = os.path.join(output_directory, "object.json")
-
     with open(json_file_path, "w") as json_file:
         json.dump(target_object, json_file, indent=4)
 
     print("get coordinates")
     
-    # Capture frames
+    # Capture frames from the RealSense camera
     frames = pipe.wait_for_frames()
     aligned_frames = align.process(frames)
-    # depth_frame = aligned_frames.get_depth_frame()
     depth_frame = aligned_frames.get_depth_frame().as_depth_frame()
     color_frame = aligned_frames.get_color_frame()
 
@@ -106,7 +183,7 @@ def get_coordinates(pipe, align, target_object="teddy bear"):
         print("Failed to capture frames.")
         return None
     
-    # Get intrinsic parameters of realsense
+    # Get intrinsic parameters of the RealSense camera
     depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
 
     # Convert the color frame to a numpy array
@@ -115,7 +192,7 @@ def get_coordinates(pipe, align, target_object="teddy bear"):
     # Save the captured color image
     image_path = capture_image(color_frame)
 
-    # Object detection using YOLO
+    # Perform object detection using YOLO
     gpt_output = detect_objects_in_image(image_path, target_object)
     if not gpt_output:
         print("Object detection failed.")
@@ -123,7 +200,7 @@ def get_coordinates(pipe, align, target_object="teddy bear"):
 
     print(gpt_output)
 
-    # Extract the coordinates from YOLO output
+    # Calculate the center of the detected bounding box
     x, y = (gpt_output['x1'] + gpt_output['x2']) // 2, (gpt_output['y1'] + gpt_output['y2']) // 2
     x1, y1, x2, y2 = gpt_output['x1'], gpt_output['y1'], gpt_output['x2'], gpt_output['y2']
 
@@ -135,52 +212,98 @@ def get_coordinates(pipe, align, target_object="teddy bear"):
     cv2.imshow('Image with Bounding Box', color_image)
     cv2.waitKey(1)  # Update the image window continuously
 
-    # Get depth at the specified coordinates (distance from the camera to a point in the scene along the camera's view direction.)
+    # Get depth at the specified coordinates
     depth = depth_frame.get_distance(x, y)
     if depth == 0:
         print("Invalid depth data at the given coordinates.")
         return None
     
-    # Distance to object
+    # Print the distance to the detected object
     print(f"Distance to object: {depth}")
 
     # Calculate real-world coordinates using intrinsic parameters
     depth_point = rs.rs2_deproject_pixel_to_point(
         depth_frame.profile.as_video_stream_profile().intrinsics, [x, y], depth)
     
-    # print(f"Real-world coordinates: {depth_point[2]}, {depth_point[0]}, {depth_point[1]}")
     print(f"x, y, z coordinates in m: {depth_point[0]}, {depth_point[1]}, {depth_point[2]}")
-    # print(f"Z-axis value: {depth_point[2]}")
 
-    # Save camera coords to json
-    x, y, z = depth_point[0], depth_point[1], depth_point[2]
-
-    # Convert to mm
-    x_mm = x*1000
-    y_mm = y*1000
-    z_mm = z*1000
+    # Convert coordinates to millimeters
+    x_mm = depth_point[0] * 1000
+    y_mm = depth_point[1] * 1000
+    z_mm = depth_point[2] * 1000
     print(f"x, y, z coordinates in mm: {x_mm}, {y_mm}, {z_mm}")
 
-
+    # Save the camera coordinates to a JSON file
     coordinates = {
-        "X": x,
-        "Y": y,
-        "Z": z
+        "X": depth_point[0],
+        "Y": depth_point[1],
+        "Z": depth_point[2]
     }
     with open("coordinates.json", "w") as json_file:
         json.dump(coordinates, json_file, indent=4)
 
+    # Transform the coordinates to the robot's base frame
     get_transformed_coords(x_mm, y_mm, z_mm)
 
     return (depth_point[2], depth_point[0], depth_point[1])
 
+
+# -----------------------------------------------------------------------------
+# Function: get_transformed_coords
+# -----------------------------------------------------------------------------
+# Purpose:
+# This function transforms the detected object's camera coordinates to the robot's
+# base frame using a homogeneous transformation matrix. The transformation matrix
+# is derived from known camera and robot coordinates, allowing the system to map
+# camera detections to the robot's coordinate system.
+#
+# Parameters:
+# - x, y, z: The real-world coordinates of the object in millimeters, as detected by the camera.
+#
+# Mathematical Overview:
+# 1) **Camera Coordinate Calculation**:
+#    The RealSense camera uses intrinsic parameters to deproject a 2D pixel (u, v) 
+#    into 3D coordinates (X_c, Y_c, Z_c) in the camera's coordinate system:
+#
+#    ```
+#    X_c = (u - cx) * Z_c / fx
+#    Y_c = (v - cy) * Z_c / fy
+#    Z_c = depth
+#    ```
+#
+#    Where:
+#    - (u, v): Pixel coordinates in the image.
+#    - (cx, cy): Principal point (optical center) of the camera.
+#    - (fx, fy): Focal lengths in the x and y axes.
+#    - Z_c: The depth value at the pixel (u, v).
+#
+# 2) **Transformation to Robot Base Frame**:
+#    The 3D coordinates in the camera's coordinate system (X_c, Y_c, Z_c) are 
+#    transformed into the robot's base frame (X_r, Y_r, Z_r) using the homogeneous 
+#    transformation matrix `T`:
+#
+#    ```
+#    [X_r]     [R11 R12 R13 Tx]   [X_c]
+#    [Y_r]  =  [R21 R22 R23 Ty] * [Y_c]
+#    [Z_r]     [R31 R32 R33 Tz]   [Z_c]
+#    [ 1 ]     [  0   0   0   1]   [ 1 ]
+#    ```
+#
+#    Where:
+#    - [X_r, Y_r, Z_r, 1]^T: The homogeneous coordinates in the robot's base frame.
+#    - [X_c, Y_c, Z_c, 1]^T: The homogeneous coordinates in the camera's coordinate frame.
+#    - [R]: 3x3 Rotation matrix derived from SVD (singular value decomposition).
+#    - [T]: Translation vector (Tx, Ty, Tz) that aligns the camera frame with the robot base frame.
+#
+# Returns:
+# - None. The transformed coordinates are saved to a JSON file for further use.
+# -----------------------------------------------------------------------------
+
+
 def get_transformed_coords(x, y, z):
 
-    # Points in the camera coordinate system (X_c, Y_c, Z_c)
+    # Known points in the camera coordinate system (X_c, Y_c, Z_c) and corresponding robot base coordinates (X_r, Y_r, Z_r)
     camera_points = np.array([
-        # [67.17, 27.76, 442.00],
-        # [-227.05, 26.86, 560.5],
-        # [-53.06, 22.75, 598.5],
         [188.7, 12.85, 706.00], #1
         [-43.55, 11.63, 782.00], #2
         [-140.57, 19.35, 689.00], #3
@@ -191,11 +314,7 @@ def get_transformed_coords(x, y, z):
         [96.11, 20.19, 582.00] #8
     ])
 
-    # Corresponding points in the robot's base coordinate system (X_r, Y_r, Z_r)
     robot_points = np.array([
-        # [-90.91, -401.30, 72.57],
-        # [122.17, -514.19, 67.10],
-        # [8.54, -547.79, 71.40],
         [-234.22, -637.53, 65.18], #1
         [-37.2, -707.2, 73.02], #2
         [59.27, -633.31, 76.42], #3
@@ -216,7 +335,7 @@ def get_transformed_coords(x, y, z):
     # Compute the covariance matrix
     H = np.dot(camera_points_centered.T, robot_points_centered)
 
-    # Singular Value Decomposition (SVD)
+    # Singular Value Decomposition (SVD) to compute the rotation matrix
     U, S, Vt = np.linalg.svd(H)
     R_matrix = np.dot(Vt.T, U.T)
 
@@ -247,69 +366,49 @@ def get_transformed_coords(x, y, z):
     # Transform the point to the robot's base frame
     transformed_point = T @ example_camera_point
 
-    # Apply sign correction if necessary
-    # Assuming you find x and y need to be inverted
+    # Extract the transformed coordinates
     X_r_new, Y_r_new, Z_r_new = transformed_point[0], transformed_point[1], transformed_point[2]
 
+    # Create a dictionary of the transformed coordinates
     transformed = {
         "X": X_r_new,
         "Y": Y_r_new,
         "Z": Z_r_new,
-        "Rx": 90.04,
+        "Rx": 90.04,   # fixed rotation values, to be edited according to the wanted rotation
         "Ry": -0.68,
         "Rz": 12.96
     }
 
+    # Save the transformed coordinates to a JSON file
     output_directory = "/home/reuben/techmanpy"
-
-    # Ensure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
-
-    # Construct the file path for JSON file
     json_file_path = os.path.join(output_directory, "coordinates.json")
-
     with open(json_file_path, "w") as json_file:
         json.dump(transformed, json_file, indent=4)
 
     print(f"Transformed coordinates in robot's base frame: X={X_r_new}, Y={Y_r_new}, Z={Z_r_new}")
 
 
-# Example usage:
-# pipe and align should be initialized RealSense pipeline and align objects
-# get_coordinates(pipe, align)
-        # results = model(color_image)
-        # print(results)
-        # for result in results:
-            # boxes = result.boxes
-            # for box in boxes:
-                # center_x, center_y = int((box.xyxy[0][0] + box.xyxy[0][2]) / 2), int((box.xyxy[0][1] + box.xyxy[0][3]) / 2)
-                # confidence = box.conf[0]
-                # class_id = int(box.cls[0])
-                # label = model.names[class_id]
-
-                # # Check if the detected object's confidence is above a threshold
-                # if label == targetObject and confidence > 0.2:
-                    # # Get the depth at the center of the bounding box
-                    # depth = depth_frame.get_distance(center_x, center_y)
-                    # if depth > 0:
-                        # # Convert depth to real world coordinates
-                        # depth_point = rs.rs2_deproject_pixel_to_point(
-                            # depth_frame.profile.as_video_stream_profile().intrinsics, [center_x, center_y], depth)
-                        #print(depth_point[2], depth_point[0], depth_point[1])
-                        #return (depth_point[2], depth_point[0], depth_point[1])  # Return as (x, y, z)
-        
-        # Check if the timeout of 5 seconds has been reached
-        #if time.time() - start_time > 15:
-        #    break
+# -----------------------------------------------------------------------------
+# Function: SpeechListener
+# -----------------------------------------------------------------------------
+# Purpose:
+# This function listens for voice commands using the microphone and recognizes
+# speech to identify the target object. The recognized object name is then used
+# for subsequent detection and coordinate transformation.
+#
+# Returns:
+# - The detected object name if successful, or None if no valid command is detected.
+# -----------------------------------------------------------------------------
 
 def SpeechListener():
     keywords = ["cup", "teddy bear", "orange", "sports ball", "vase"]
 
-    # Initialize recognizer
+    # Initialize the speech recognizer
     r = sr.Recognizer()
     try:
         with sr.Microphone() as source:
-            # Adjust energy threshold
+            # Adjust energy threshold for ambient noise
             print("Adjusting threshold...")
             r.adjust_for_ambient_noise(source, duration=1)
             print("Ready to listen...")
@@ -323,13 +422,12 @@ def SpeechListener():
             
             print("Recognized speech: ", result)
 
-            # Find requested object
             # Check if any keyword is in the recognized speech
             for keyword in keywords:
                 if keyword in result:
                     detected_keyword = keyword
                     print(f"'{keyword}' detected in request.")
-                    if result == "this" or result == "vas" or result == "pause" or result == "false" or result == "voss": # In case it can't recognize the pronounciation of 'vase'
+                    if result == "this" or result == "vas" or result == "pause" or result == "false" or result == "voss": # Handle mispronunciations
                         detected_keyword = "vase"
                     return detected_keyword
             
@@ -344,11 +442,27 @@ def SpeechListener():
         sys.exit(0)
 
 
+# -----------------------------------------------------------------------------
+# Function: main
+# -----------------------------------------------------------------------------
+# Purpose:
+# This is the main function that controls the overall flow of the program. It
+# prompts the user to choose between typing the object name or using voice
+# recognition for detection. The detected object is then processed to obtain
+# its coordinates, which are transformed and saved.
+#
+# Parameters:
+# - None
+#
+# Returns:
+# - None
+# -----------------------------------------------------------------------------
+
 def main():
     print("Starting object detection...")
 
     while True:
-        # Prompt user for the object to detect
+        # Prompt the user to either type the object name or use voice recognition
         choice = input("Enter 't' to type requested object or 'l' to say requested object or type 'q' to exit: ").strip()
 
         if choice.lower() == "q":
@@ -362,7 +476,7 @@ def main():
 
             detection_count = 0  # Reset detection count
 
-            while detection_count < 2:  # Keep looking for the object until it's detected twice, for better lighting and exposure
+            while detection_count < 2:  # Keep looking for the object until it's detected twice
                 try:
                     coords = get_coordinates(pipe, align, target_object=target_object)
                     if coords:
