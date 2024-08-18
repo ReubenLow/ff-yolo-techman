@@ -52,6 +52,8 @@ depth_scale = depth_sensor.get_depth_scale()
 align_to = rs.stream.color
 align = rs.align(align_to)
 
+# Specify the output directory of the coordinates and detected object
+output_directory = "/home/reuben/techmanpy"
 
 # -----------------------------------------------------------------------------
 # Function: capture_image
@@ -161,7 +163,8 @@ def detect_objects_in_image(image_path, target_object):
 
 def get_coordinates(pipe, align, target_object="teddy bear"):
 
-    output_directory = "/home/reuben/techmanpy"
+    # output_directory = "/home/reuben/techmanpy"
+    global output_directory
 
     # Ensure the output directory exists
     os.makedirs(output_directory, exist_ok=True)
@@ -301,6 +304,8 @@ def get_coordinates(pipe, align, target_object="teddy bear"):
 
 
 def get_transformed_coords(x, y, z):
+    
+    global output_directory
 
     # Known points in the camera coordinate system (X_c, Y_c, Z_c) and corresponding robot base coordinates (X_r, Y_r, Z_r)
     camera_points = np.array([
@@ -380,7 +385,7 @@ def get_transformed_coords(x, y, z):
     }
 
     # Save the transformed coordinates to a JSON file
-    output_directory = "/home/reuben/techmanpy"
+    # output_directory = "/home/reuben/techmanpy"
     os.makedirs(output_directory, exist_ok=True)
     json_file_path = os.path.join(output_directory, "coordinates.json")
     with open(json_file_path, "w") as json_file:
