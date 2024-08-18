@@ -20,3 +20,37 @@ The project is divided into two main folders:
 
 ## Installation
 The installation steps for setting up the YOLO object detection and the Techman robotic arm control scripts are provided in their respective folders. Please refer to the README files within the cvfolder and techmanfolder for detailed installation instructions.
+
+## Usage
+### Step 1: Run Object Detection
+
+1. Navigate to the YOLO object detection folder:
+``` bash
+cd cvfolder/examples/simple_scripts
+```
+2. Run the object detection script to detect objects and output their coordinates:
+``` bash
+python q_yolo_calibration.py
+```
+- The detected object's name is saved in object.json.
+- The coordinates are saved in coordinates.json.
+
+### Note: You must run q_yolo_calibration.py first to obtain the coordinates of the object. These coordinates will be used by the robotic arm to pick up the object.
+
+## Step 2: Run Robot Movement Script
+1. Navigate to the Techman robot movement folder
+``` bash
+cd techmanfolder
+```
+2. Run the script to move the robot arm based on the detected coordinates:
+``` bash
+python3 testfile.py <robot-ip-address>
+```
+The robot will move to pick up the object specified in object.json using the coordinates from coordinates.json.
+
+
+
+
+
+
+
