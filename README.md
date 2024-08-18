@@ -6,6 +6,7 @@ The project is divided into two main folders:
  - Robot Movement: Uses the detected coordinates to guide the robotic arm to pick up the specified object.
 
 ## Directory layout
+```
 ├── cvfolder/
 │   ├── examples/
 │   │   ├── simple_scripts/
@@ -15,6 +16,7 @@ The project is divided into two main folders:
 ├── techmanfolder/
 │   ├── testfile.py
 └── README.md
+```
 
 ## Installation
 The installation steps for setting up the YOLO object detection and the Techman robotic arm control scripts are provided in their respective folders. Please refer to the README files within the cvfolder and techmanfolder for detailed installation instructions.
