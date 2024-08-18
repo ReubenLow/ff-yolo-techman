@@ -48,9 +48,6 @@ python3 testfile.py <robot-ip-address>
 ```
 The robot will move to pick up the object specified in object.json using the coordinates from coordinates.json.
 
-
-
-
-
-
+### Future Updates
+Future updates will focus on integrating both the object detection and robot movement scripts into a single script. This will streamline the process, allowing the manipulator and camera to detect an object and move the robotic arm in one operation.
 
