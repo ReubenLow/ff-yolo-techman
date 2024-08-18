@@ -70,6 +70,8 @@ Bug reports, patches and suggestions are welcome! Feel free to open an [issue](h
 ![Screenshot from 2024-08-18 19-41-18](https://github.com/user-attachments/assets/8821c2d9-e88a-4463-833d-e36923b39369)
 
 ### 2. Run the techman script
-python3 testfile.py <IP address of techman robot>
+```
+$ python3 testfile.py <IP address of techman robot>
+```
 
 This package is released under the [MIT license](https://github.com/jvdtoorn/techmanpy/blob/master/LICENSE).
